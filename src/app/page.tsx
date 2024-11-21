@@ -22,6 +22,7 @@ type ValidationError = {
 const SVGValidator: React.FC = () => {
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [svgContent, setSvgContent] = useState<string>("");
+  console.log("🚀 ~ svgContent:", svgContent);
 
   useEffect(() => {
     // Apply syntax highlighting whenever errors are updated
@@ -94,8 +95,14 @@ const SVGValidator: React.FC = () => {
       });
 
       setErrors(newErrors);
-    } catch (error: any) {
-      setErrors([{ tag: "N/A", snippet: "", message: error.message }]);
+    } catch (error: unknown) {
+      setErrors([
+        {
+          tag: "N/A",
+          snippet: "",
+          message: (error as { message: string }).message,
+        },
+      ]);
     }
   };
 
