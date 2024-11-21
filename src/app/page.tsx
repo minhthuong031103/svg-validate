@@ -1,101 +1,155 @@
-import Image from "next/image";
+"use client";
+import React, { useEffect, useState } from "react";
+import Prism from "prismjs";
+import "prismjs/themes/prism.css"; // Or use another theme like prism-okaidia.css
 
-export default function Home() {
+const graphicTags = [
+  "path",
+  "polygon",
+  "rect",
+  "circle",
+  "ellipse",
+  "line",
+  "polyline",
+];
+
+type ValidationError = {
+  tag: string;
+  snippet: string; // Full SVG element snippet
+  message: string;
+};
+
+const SVGValidator: React.FC = () => {
+  const [errors, setErrors] = useState<ValidationError[]>([]);
+  const [svgContent, setSvgContent] = useState<string>("");
+
+  useEffect(() => {
+    // Apply syntax highlighting whenever errors are updated
+    Prism.highlightAll();
+  }, [errors]);
+
+  const validateSVG = (svg: string) => {
+    setErrors([]); // Clear previous errors
+
+    try {
+      // Fix syntax issues like &quote
+      const fixedSvg = svg.replace(/&quote/g, '"');
+
+      // Parse SVG
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(fixedSvg, "image/svg+xml");
+
+      // Check for parse errors
+      const parseError = doc.querySelector("parsererror");
+      if (parseError) {
+        throw new Error("Invalid SVG syntax: " + parseError.textContent);
+      }
+
+      // Validate each graphic tag
+      const newErrors: ValidationError[] = [];
+      graphicTags.forEach((tag) => {
+        const elements = doc.getElementsByTagName(tag);
+
+        Array.from(elements).forEach((element) => {
+          // Extract the element as a string snippet
+          const snippet = element.outerHTML;
+
+          // Check for required attributes and their values
+          const attributes = [
+            "data-categoryid",
+            "data-targetviewbox",
+            "data-zoneid",
+          ];
+          attributes.forEach((attr) => {
+            const attrValue = element.getAttribute(attr);
+
+            if (!attrValue) {
+              newErrors.push({
+                tag,
+                snippet,
+                message: `<${tag}> missing attribute: ${attr}`,
+              });
+            } else {
+              // Trim the value to check for leading/trailing spaces
+              const trimmedValue = attrValue.trim();
+              if (attrValue !== trimmedValue) {
+                newErrors.push({
+                  tag,
+                  snippet,
+                  message: `<${tag}> attribute "${attr}" has leading or trailing spaces.`,
+                });
+              }
+
+              // Check for invalid syntax like `&quote`
+              if (/&quote/.test(attrValue)) {
+                newErrors.push({
+                  tag,
+                  snippet,
+                  message: `<${tag}> attribute "${attr}" contains invalid characters like "&quote".`,
+                });
+              }
+            }
+          });
+        });
+      });
+
+      setErrors(newErrors);
+    } catch (error: any) {
+      setErrors([{ tag: "N/A", snippet: "", message: error.message }]);
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = reader.result as string;
+        setSvgContent(content);
+        validateSVG(content);
+      };
+      reader.readAsText(file);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+    <div>
+      <h1>SVG Validator</h1>
+      <input type="file" accept=".svg" onChange={handleFileUpload} />
+      <div className="">
+        <h2>Validation Errors</h2>
+        {errors.length > 0 ? (
+          <ul>
+            {errors.map((error, index) => (
+              <li key={index}>
+                <p>
+                  <strong>Error:</strong> {error.message}
+                </p>
+                <pre
+                  className="language-markup"
+                  style={{
+                    maxWidth: "100%", // Limit width to container
+                    overflowX: "auto", // Add horizontal scrolling
+                    wordWrap: "break-word", // Allow breaking long words
+                    whiteSpace: "pre-wrap", // Preserve whitespace and enable wrapping
+                    backgroundColor: "#f8f9fa",
+                    padding: "10px",
+                    borderRadius: "5px",
+                    boxShadow: "inset 0 0 5px rgba(0, 0, 0, 0.1)",
+                    fontSize: "0.9em", // Adjust font size
+                  }}
+                >
+                  <code>{error.snippet}</code>
+                </pre>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No errors found.</p>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default SVGValidator;

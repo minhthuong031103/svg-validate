@@ -2,20 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+pre {
+  max-width: 100%; /* Limit the width to the container */
+  overflow-x: auto; /* Enable horizontal scrolling if content exceeds max width */
+  word-wrap: break-word; /* Break long words if necessary */
+  white-space: pre-wrap; /* Preserve whitespace and enable wrapping */
+  background-color: #f8f9fa; /* Light background for readability */
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+  font-size: 0.9em; /* Slightly smaller font for better readability */
 }
