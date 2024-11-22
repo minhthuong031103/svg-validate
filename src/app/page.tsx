@@ -1,7 +1,9 @@
 "use client";
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useRef, useState } from "react";
+import { Editor, OnMount } from "@monaco-editor/react";
 import Prism from "prismjs";
-import "prismjs/themes/prism.css"; // Or use another theme like prism-okaidia.css
+import "prismjs/themes/prism.css";
 
 const graphicTags = [
   "path",
@@ -15,47 +17,50 @@ const graphicTags = [
 
 type ValidationError = {
   tag: string;
-  snippet: string; // Full SVG element snippet
+  snippet: string;
   message: string;
+  line: number; // Line number in the editor
 };
 
 const SVGValidator: React.FC = () => {
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [svgContent, setSvgContent] = useState<string>("");
-  console.log("🚀 ~ svgContent:", svgContent);
+  const [editorContent, setEditorContent] = useState<string>("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false); // Modal state
+  const editorRef = useRef<any>(null);
 
   useEffect(() => {
-    // Apply syntax highlighting whenever errors are updated
     Prism.highlightAll();
   }, [errors]);
 
+  const handleEditorDidMount: OnMount = (editor) => {
+    editorRef.current = editor;
+  };
+
   const validateSVG = (svg: string) => {
-    setErrors([]); // Clear previous errors
+    setErrors([]);
 
     try {
-      // Fix syntax issues like &quote
       const fixedSvg = svg.replace(/&quote/g, '"');
-
-      // Parse SVG
       const parser = new DOMParser();
       const doc = parser.parseFromString(fixedSvg, "image/svg+xml");
 
-      // Check for parse errors
       const parseError = doc.querySelector("parsererror");
       if (parseError) {
         throw new Error("Invalid SVG syntax: " + parseError.textContent);
       }
 
-      // Validate each graphic tag
       const newErrors: ValidationError[] = [];
+      const lines = svg.split("\n");
+
       graphicTags.forEach((tag) => {
         const elements = doc.getElementsByTagName(tag);
 
         Array.from(elements).forEach((element) => {
-          // Extract the element as a string snippet
           const snippet = element.outerHTML;
+          const firstLine = snippet.split("\n")[0];
+          const lineIndex = lines.findIndex((line) => line.includes(firstLine));
 
-          // Check for required attributes and their values
           const attributes = [
             "data-categoryid",
             "data-targetviewbox",
@@ -69,24 +74,25 @@ const SVGValidator: React.FC = () => {
                 tag,
                 snippet,
                 message: `<${tag}> missing attribute: ${attr}`,
+                line: lineIndex + 1,
               });
             } else {
-              // Trim the value to check for leading/trailing spaces
               const trimmedValue = attrValue.trim();
               if (attrValue !== trimmedValue) {
                 newErrors.push({
                   tag,
                   snippet,
                   message: `<${tag}> attribute "${attr}" has leading or trailing spaces.`,
+                  line: lineIndex + 1,
                 });
               }
 
-              // Check for invalid syntax like `&quote`
               if (/&quote/.test(attrValue)) {
                 newErrors.push({
                   tag,
                   snippet,
                   message: `<${tag}> attribute "${attr}" contains invalid characters like "&quote".`,
+                  line: lineIndex + 1,
                 });
               }
             }
@@ -95,12 +101,17 @@ const SVGValidator: React.FC = () => {
       });
 
       setErrors(newErrors);
-    } catch (error: unknown) {
+
+      if (newErrors.length === 0) {
+        setShowSuccessModal(true); // Show modal if no errors
+      }
+    } catch (error: any) {
       setErrors([
         {
           tag: "N/A",
           snippet: "",
-          message: (error as { message: string }).message,
+          message: error.message,
+          line: 0,
         },
       ]);
     }
@@ -113,17 +124,57 @@ const SVGValidator: React.FC = () => {
       reader.onload = () => {
         const content = reader.result as string;
         setSvgContent(content);
+        setEditorContent(content);
         validateSVG(content);
       };
       reader.readAsText(file);
     }
   };
 
+  const handleEditorChange = (value: string | undefined) => {
+    if (value) {
+      setEditorContent(value);
+      validateSVG(value);
+    }
+  };
+
+  const saveToFile = () => {
+    const blob = new Blob([editorContent], { type: "image/svg+xml" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "validated.svg";
+    link.click();
+  };
+
+  const closeModal = () => {
+    setShowSuccessModal(false); // Close modal
+  };
+
   return (
     <div>
       <h1>SVG Validator</h1>
       <input type="file" accept=".svg" onChange={handleFileUpload} />
-      <div className="">
+      <div style={{ marginTop: "20px", height: "500px" }}>
+        <Editor
+          height="500px"
+          defaultLanguage="xml"
+          value={editorContent}
+          onChange={handleEditorChange}
+          onMount={handleEditorDidMount}
+          options={{
+            readOnly: false,
+            automaticLayout: true,
+          }}
+        />
+      </div>
+      <button
+        className="bg-black text-white rounded-lg p-2"
+        onClick={saveToFile}
+        style={{ marginTop: "10px" }}
+      >
+        Save SVG
+      </button>
+      <div>
         <h2>Validation Errors</h2>
         {errors.length > 0 ? (
           <ul>
@@ -132,6 +183,9 @@ const SVGValidator: React.FC = () => {
                 <p>
                   <strong>Error:</strong> {error.message}
                 </p>
+                {/* <button onClick={() => focusEditorLine(error.line)}>
+                  Go to Line
+                </button> */}
                 <pre
                   className="language-markup"
                   style={{
@@ -155,6 +209,27 @@ const SVGValidator: React.FC = () => {
           <p>No errors found.</p>
         )}
       </div>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+            zIndex: 1000,
+          }}
+        >
+          <h2>Validation Successful!</h2>
+          <p>Your SVG is valid and contains no errors.</p>
+          <button onClick={closeModal}>Close</button>
+        </div>
+      )}
     </div>
   );
 };
