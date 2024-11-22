@@ -24,10 +24,11 @@ type ValidationError = {
 
 const SVGValidator: React.FC = () => {
   const [errors, setErrors] = useState<ValidationError[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [svgContent, setSvgContent] = useState<string>("");
   const [editorContent, setEditorContent] = useState<string>("");
   const [showSuccessModal, setShowSuccessModal] = useState(false); // Modal state
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<unknown>(null);
 
   useEffect(() => {
     Prism.highlightAll();
@@ -105,12 +106,12 @@ const SVGValidator: React.FC = () => {
       if (newErrors.length === 0) {
         setShowSuccessModal(true); // Show modal if no errors
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrors([
         {
           tag: "N/A",
           snippet: "",
-          message: error.message,
+          message: (error as Error).message,
           line: 0,
         },
       ]);
